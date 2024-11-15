@@ -1,9 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fooddeliveryapp/pages/onboard.dart';
 
-void main() {
-  // Set the status bar to a light color (or dark as you prefer)
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
     statusBarColor: Colors.transparent, // Makes status bar transparent
     statusBarIconBrightness: Brightness.dark, // Adjust icons (light/dark)
