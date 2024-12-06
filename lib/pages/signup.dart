@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fooddeliveryapp/pages/bottomnav.dart';
 import 'package:fooddeliveryapp/pages/login.dart';
-
+import 'package:fooddeliveryapp/service/database.dart';
+import 'package:fooddeliveryapp/service/shared_pref.dart';
+import 'package:random_string/random_string.dart';
 import '../widget/widget_support.dart';
 
 class SignUp extends StatefulWidget {
@@ -13,20 +15,19 @@ class SignUp extends StatefulWidget {
 }
 
 class _SignUpState extends State<SignUp> {
-  String email = "", password = "", name = "";
-
   final TextEditingController namecontroller = TextEditingController();
   final TextEditingController passwordcontroller = TextEditingController();
   final TextEditingController mailcontroller = TextEditingController();
 
   final _forkey = GlobalKey<FormState>();
 
-  registration() async {
-    if (password.isNotEmpty) {
-      try {
-        UserCredential userCredential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(email: email, password: password);
+  Future<void> registration() async {
+    try {
+      // Ensure that the form is valid before proceeding
+      if (_forkey.currentState!.validate()) {
+        // Create user with Firebase
 
+        // Show a success message
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           backgroundColor: Colors.green,
           content: const Text(
@@ -34,29 +35,51 @@ class _SignUpState extends State<SignUp> {
             style: TextStyle(fontSize: 20.0),
           ),
         ));
+
+        // Generate a unique user ID
+        String userId = randomAlphaNumeric(10);
+
+        // Add user data to Firestore
+        Map<String, dynamic> addUserInfo = {
+          "Name": namecontroller.text,
+          "Email": mailcontroller.text,
+          "Wallet": "0",
+          "Id": userId,
+        };
+
+        await DatabaseMethods().addUserDetail(addUserInfo, userId);
+
+        // Save user data locally with SharedPreferences
+        await SharedPreferenceHelper().saveUserName(namecontroller.text);
+        await SharedPreferenceHelper().saveUserEmail(mailcontroller.text);
+        await SharedPreferenceHelper().saveUserWallet('0');
+        await SharedPreferenceHelper().saveUserId(userId);
+
+        // Navigate to the BottomNav screen after successful sign-up
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => BottomNav()),
         );
-      } on FirebaseException catch (e) {
-        if (e.code == 'weak-password') {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            backgroundColor: Colors.orangeAccent,
-            content: const Text(
-              "Password Provided is too Weak",
-              style: TextStyle(fontSize: 18.0),
-            ),
-          ));
-        } else if (e.code == "email-already-in-use") {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            backgroundColor: Colors.orangeAccent,
-            content: const Text(
-              "Account Already exists",
-              style: TextStyle(fontSize: 18.0),
-            ),
-          ));
-        }
       }
+    } on FirebaseAuthException catch (e) {
+      // Handle errors from FirebaseAuth
+      String errorMessage = '';
+      if (e.code == 'weak-password') {
+        errorMessage = "Password Provided is too Weak";
+      } else if (e.code == "email-already-in-use") {
+        errorMessage = "Account Already exists";
+      } else {
+        errorMessage = e.message ?? "An error occurred!";
+      }
+
+      // Show an error message
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        backgroundColor: Colors.orangeAccent,
+        content: Text(
+          errorMessage,
+          style: const TextStyle(fontSize: 18.0),
+        ),
+      ));
     }
   }
 
@@ -165,9 +188,6 @@ class _SignUpState extends State<SignUp> {
                                     prefixIcon:
                                         const Icon(Icons.email_outlined),
                                   ),
-                                  onChanged: (value) {
-                                    email = value;
-                                  },
                                 ),
                                 const SizedBox(height: 20.0),
                                 TextFormField(
@@ -187,22 +207,10 @@ class _SignUpState extends State<SignUp> {
                                     prefixIcon:
                                         const Icon(Icons.password_outlined),
                                   ),
-                                  onChanged: (value) {
-                                    password = value;
-                                  },
                                 ),
                                 const SizedBox(height: 40.0),
                                 GestureDetector(
-                                  onTap: () {
-                                    if (_forkey.currentState!.validate()) {
-                                      setState(() {
-                                        email = mailcontroller.text;
-                                        name = namecontroller.text;
-                                        password = passwordcontroller.text;
-                                      });
-                                      registration();
-                                    }
-                                  },
+                                  onTap: registration,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 15.0),
